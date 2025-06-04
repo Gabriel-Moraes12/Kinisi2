@@ -1,0 +1,8 @@
+# Ignorar dependências
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+.expo/
+.expo-shared/
+.env
+*.log
