@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 /**
- * Interface para erros da API.
+ * Interface para erros da API..
  */
 interface ApiError {
   message: string;
