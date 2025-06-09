@@ -19,7 +19,7 @@ interface ApiError {
 
 // Criação da instância do axios para requisições à API
 const api: AxiosInstance = axios.create({
-  baseURL: 'http://192.168.110.198:5000',
+  baseURL: 'http://192.168.40.198:5000',
   timeout: 10000,
   headers: new AxiosHeaders({
     'Content-Type': 'application/json'
@@ -36,20 +36,23 @@ api.interceptors.request.use(
       data: config.data
     });
 
-    // Adiciona prefixos de rota para autenticação e amigos
-    const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
-    const friendRoutes = ['/send-request', '/accept-request', '/reject-request', '/list', '/search'];
+    const authRoutes = ['login', 'register', 'forgot-password', 'reset-password', 'verify-email'];
+const friendRoutes = ['send-request', 'accept-request', 'reject-request', 'list', 'search'];
 
-    if (config.url) {
-      const shouldAddAuthPrefix = authRoutes.some(route => config.url?.startsWith(route));
-      const shouldAddFriendPrefix = friendRoutes.some(route => config.url?.startsWith(route));
+if (config.url) {
+  const shouldAddAuthPrefix = authRoutes.some(route => 
+    config.url?.includes(route) && !config.url?.startsWith('/auth')
+  );
+  const shouldAddFriendPrefix = friendRoutes.some(route => 
+    config.url?.includes(route) && !config.url?.startsWith('/friends')
+  );
 
-      if (shouldAddAuthPrefix) {
-        config.url = '/auth' + config.url;
-      } else if (shouldAddFriendPrefix) {
-        config.url = '/friends' + config.url;
-      }
-    }
+  if (shouldAddAuthPrefix) {
+    config.url = `/auth/${config.url}`;
+  } else if (shouldAddFriendPrefix) {
+    config.url = `/friends/${config.url}`;
+  }
+}
 
     // Adiciona Authorization header se usuário estiver logado
     const user = await AsyncStorage.getItem('@user');

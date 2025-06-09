@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import TopBar from '../componentes/TopBar';
@@ -20,6 +20,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const [dailyStats, setDailyStats] = useState<{ total: number; correct: number; wrong: number }>({ total: 0, correct: 0, wrong: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
+
+  // Novo estado para amigos
+  const [friends, setFriends] = useState<{ _id: string; name: string; profileImage?: string }[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(true);
 
   useEffect(() => {
     const checkAndUpdateFact = async () => {
@@ -62,6 +66,37 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     fetchStats();
   }, [user?._id]);
 
+  // Carregar amigos aceitos
+  useEffect(() => {
+    const loadFriends = async () => {
+      if (!user?._id) {
+        setFriends([]);
+        setFriendsLoading(false);
+        return;
+      }
+      try {
+        setFriendsLoading(true);
+        const response = await api.get(`/friends/list/${user._id}`);
+        const acceptedFriends = response.data.friends
+          .filter((f: any) => f.status === 'accepted')
+          .map((f: any) => {
+            const u = typeof f.userId === 'object' ? f.userId : { _id: f.userId, name: 'Amigo' };
+            return {
+              _id: u._id,
+              name: u.name,
+              profileImage: u.profileImage
+            };
+          });
+        setFriends(acceptedFriends);
+      } catch (e) {
+        setFriends([]);
+      } finally {
+        setFriendsLoading(false);
+      }
+    };
+    loadFriends();
+  }, [user?._id]);
+
   const fetchNewFact = async () => {
     try {
       setIsLoading(true);
@@ -71,7 +106,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer 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`,
+          'Authorization': `Bearer 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`,
           'HTTP-Referer': 'https://projetokinisi.com',
           'X-Title': 'ProjetoKinisi'
         },
@@ -185,6 +220,36 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         )}
       </View>
 
+      {/* Lista de amigos adicionados */}
+      <View style={styles.friendsSection}>
+        <Text style={styles.friendsTitle}>Seus Amigos</Text>
+        {friendsLoading ? (
+          <ActivityIndicator size="small" color="#4a90e2" />
+        ) : friends.length === 0 ? (
+          <Text style={styles.noFriendsText}>Você ainda não adicionou amigos</Text>
+        ) : (
+          <View>
+            {friends.map(friend => (
+              <View key={friend._id} style={styles.friendItem}>
+                {friend.profileImage ? (
+                  <Image source={{ uri: friend.profileImage }} style={styles.friendAvatar} />
+                ) : (
+                  <View style={styles.friendAvatarPlaceholder}>
+                    <Text style={styles.friendAvatarInitial}>
+                      {friend.name ? friend.name.charAt(0).toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.friendInfo}>
+                  <Text style={styles.friendName}>{friend.name}</Text>
+                  <Text style={styles.friendId}>ID: {friend._id}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={styles.emptySpace} />
       
       <DownBar />
@@ -285,6 +350,68 @@ const styles = StyleSheet.create({
   },
   emptySpace: {
     flex: 1,
+  },
+  // Amigos
+  friendsSection: {
+    backgroundColor: '#232323',
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+    padding: 16,
+  },
+  friendsTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noFriendsText: {
+    color: '#aaa',
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 14,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: '#2c2c2c',
+    borderRadius: 8,
+    padding: 10,
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  friendAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1f51ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  friendAvatarInitial: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  friendInfo: {
+    flex: 1,
+  },
+  friendName: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  friendId: {
+    color: '#aaa',
+    fontSize: 12,
   },
 });
 

@@ -38,11 +38,15 @@ const FriendSelectionScreen: React.FC<Props> = ({ navigation }) => {
         const response = await api.get(`/friends/list/${user._id}`);
         const acceptedFriends = response.data.friends
           .filter((f: any) => f.status === 'accepted')
-          .map((f: any) => ({
-            _id: f.userId._id,
-            name: f.userId.name,
-            profileImage: f.userId.profileImage
-          }));
+          .map((f: any) => {
+            // f.userId pode ser um objeto populado
+            const u = typeof f.userId === 'object' ? f.userId : { _id: f.userId, name: 'Amigo' };
+            return {
+              _id: u._id,
+              name: u.name,
+              profileImage: u.profileImage
+            };
+          });
         
         setFriends(acceptedFriends);
       } catch (error: any) {

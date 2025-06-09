@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Importa React e hooks para estado e efeitos colaterais
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -10,80 +10,55 @@ import {
   ActivityIndicator,
   ListRenderItem,
   Image
-} from 'react-native'; // Importa componentes do React Native
-import TopBar from '../componentes/TopBar'; // Importa o componente de barra superior
-import DownBar from '../componentes/DownBar'; // Importa o componente de barra inferior
-import api from '../api'; // Importa a instância de API para requisições HTTP
-import { useAuth } from '../funcoes/AuthContext'; // Importa contexto de autenticação
+} from 'react-native';
+import TopBar from '../componentes/TopBar';
+import DownBar from '../componentes/DownBar';
+import api from '../api';
+import { useAuth } from '../funcoes/AuthContext';
+import { Friend, FriendRequest, User } from '../types';
 
-// Define a interface para o usuário
-interface User {
-  _id: string;
-  name: string;
-  profileImage?: string;
-}
-
-// Define a interface para solicitações de amizade
-interface FriendRequest {
-  userId: string | User;
-  date: Date;
-}
-
-// Define a interface para amigos
-interface Friend {
-  userId: string | User;
-  status: 'pending' | 'accepted';
-  date: Date;
-}
-
-// Componente principal da tela de perfil
 const PerfilScreen = () => {
-  const { user, isAuthenticated } = useAuth(); // Obtém usuário autenticado e status de autenticação
-  const [searchQuery, setSearchQuery] = useState<string>(''); // Estado para consulta de busca
-  const [searchResults, setSearchResults] = useState<User[]>([]); // Estado para resultados da busca
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]); // Estado para solicitações de amizade
-  const [friends, setFriends] = useState<Friend[]>([]); // Estado para lista de amigos
-  const [loading, setLoading] = useState<boolean>(false); // Estado para loading
+  const { user, isAuthenticated } = useAuth();
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Efeito para carregar dados de amizade quando o usuário muda
   useEffect(() => {
     if (user?._id) {
       loadFriendData();
     }
   }, [user?._id]);
 
-  // Função para carregar amigos e solicitações pendentes
   const loadFriendData = async () => {
     if (!user?._id) return;
     
     try {
-      setLoading(true); // Ativa loading
-      const response = await api.get(`/list/${user._id}`); // Busca dados do backend
+      setLoading(true);
+      const response = await api.get(`/friends/list/${user._id}`);
       
-      // Normaliza os dados dos amigos
       const normalizedFriends = response.data.friends.map((friend: any) => ({
         ...friend,
         userId: typeof friend.userId === 'string' ? 
           { _id: friend.userId, name: 'Usuário' } : friend.userId
       }));
       
-      // Normaliza os dados das solicitações
       const normalizedRequests = response.data.pendingRequests.map((request: any) => ({
         ...request,
         userId: typeof request.userId === 'string' ? 
           { _id: request.userId, name: 'Usuário' } : request.userId
       }));
 
-      setFriendRequests(normalizedRequests); // Atualiza estado das solicitações
-      setFriends(normalizedFriends); // Atualiza estado dos amigos
+      setFriendRequests(normalizedRequests);
+      setFriends(normalizedFriends);
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar amigos'); // Mostra erro
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar amigos');
     } finally {
-      setLoading(false); // Desativa loading
+      setLoading(false);
     }
   };
 
-  // Função para buscar usuários pelo ID
   const searchUsers = async () => {
     if (!searchQuery.trim()) {
       Alert.alert('Atenção', 'Por favor, digite um ID para buscar');
@@ -94,14 +69,14 @@ const PerfilScreen = () => {
       setLoading(true);
       setSearchResults([]);
       
-      const response = await api.get(`/search?id=${searchQuery}`); // Busca usuários
+      const response = await api.get(`/friends/search?id=${searchQuery}`);
       
       if (response.data.length === 0) {
         Alert.alert('Nenhum resultado', `Não encontramos usuários com o ID "${searchQuery}"`);
         return;
       }
 
-      setSearchResults(response.data); // Atualiza resultados da busca
+      setSearchResults(response.data);
     } catch (error: any) {
       Alert.alert('Erro na busca', error.response?.data?.error || 'Falha na busca de usuários');
     } finally {
@@ -109,7 +84,6 @@ const PerfilScreen = () => {
     }
   };
 
-  // Função para enviar solicitação de amizade
   const sendFriendRequest = async (userId: string) => {
     if (!isAuthenticated || !user?._id) {
       Alert.alert('Erro', 'Você precisa estar logado para adicionar amigos');
@@ -128,12 +102,12 @@ const PerfilScreen = () => {
         recipientId: userId
       };
       
-      const response = await api.post('/send-request', requestData); // Envia solicitação
+      const response = await api.post('/friends/send-request', requestData);
       
       Alert.alert('Sucesso', response.data.message || 'Solicitação enviada com sucesso!');
       setSearchQuery('');
       setSearchResults([]);
-      await loadFriendData(); // Atualiza dados após envio
+      await loadFriendData();
     } catch (error: any) {
       let errorMessage = 'Falha ao enviar solicitação';
       if (error.response?.data?.error) {
@@ -147,34 +121,45 @@ const PerfilScreen = () => {
     }
   };
 
-  // Função para aceitar solicitação de amizade
-  const acceptFriendRequest = async (requestId: string) => {
-    if (!isAuthenticated || !user?._id) return;
+  const acceptFriendRequest = async (requesterUserId: string) => {
+  if (!isAuthenticated || !user?._id) return;
+  
+  try {
+    setLoading(true);
+    console.log('Enviando para:', `/friends/accept-request`, { // Adicione este log
+      userId: user._id,
+      requestId: requesterUserId
+    });
     
-    try {
-      setLoading(true);
-      const response = await api.post('/accept-request', {
-        userId: user._id,
-        requestId
-      });
-      await loadFriendData();
-      Alert.alert('Sucesso', response.data.message || 'Agora vocês são amigos!');
-    } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Falha ao aceitar solicitação');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const response = await api.post('/friends/accept-request', {
+      userId: user._id,
+      requestId: requesterUserId
+    });
+    
+    console.log('Resposta:', response.data); // Adicione este log
+    await loadFriendData();
+    Alert.alert('Sucesso', response.data.message || 'Agora vocês são amigos!');
+  } catch (error: any) {
+    console.error('Erro completo:', error); // Adicione este log
+    Alert.alert(
+      'Erro', 
+      error.response?.data?.error || 
+      error.message || 
+      'Falha ao aceitar solicitação'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
-  // Função para recusar solicitação de amizade
-  const rejectFriendRequest = async (requestId: string) => {
+  const rejectFriendRequest = async (requesterUserId: string) => {
     if (!isAuthenticated || !user?._id) return;
     
     try {
       setLoading(true);
-      await api.post('/reject-request', {
+      await api.post('/friends/reject-request', {
         userId: user._id,
-        requestId
+        requestId: requesterUserId
       });
       await loadFriendData();
       Alert.alert('Sucesso', 'Solicitação recusada');
@@ -185,7 +170,6 @@ const PerfilScreen = () => {
     }
   };
 
-  // Renderiza um resultado da busca de usuário
   const renderSearchResult: ListRenderItem<User> = ({ item }) => (
     <View style={styles.userItem}>
       <View style={styles.userInfoContainer}>
@@ -213,7 +197,6 @@ const PerfilScreen = () => {
     </View>
   );
 
-  // Renderiza uma solicitação de amizade pendente
   const renderFriendRequest: ListRenderItem<FriendRequest> = ({ item }) => {
     const requestUser = typeof item.userId === 'string' ? 
       { _id: item.userId, name: 'Usuário' } : item.userId;
@@ -252,7 +235,6 @@ const PerfilScreen = () => {
     );
   };
 
-  // Renderiza um amigo aceito
   const renderFriend: ListRenderItem<Friend> = ({ item }) => {
     const friendUser = typeof item.userId === 'string' ? 
       { _id: item.userId, name: 'Amigo' } : item.userId;
@@ -278,14 +260,12 @@ const PerfilScreen = () => {
     );
   };
 
-  // Renderização principal da tela
   return (
     <View style={styles.container}>
-      <TopBar /> {/* Barra superior */}
+      <TopBar />
       <View style={styles.content}>
         <Text style={styles.title}>Gerenciar Amizades</Text>
 
-        {/* Campo de busca */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -310,10 +290,8 @@ const PerfilScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Loader global */}
         {loading && <ActivityIndicator size="large" style={styles.loader} color="#fff" />}
 
-        {/* Resultados da busca */}
         {searchResults.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Resultados da Busca</Text>
@@ -325,7 +303,6 @@ const PerfilScreen = () => {
           </View>
         )}
 
-        {/* Solicitações pendentes */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Solicitações Pendentes</Text>
           {friendRequests.length === 0 ? (
@@ -339,7 +316,6 @@ const PerfilScreen = () => {
           )}
         </View>
 
-        {/* Lista de amigos */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Seus Amigos</Text>
           {friends.length === 0 ? (
@@ -353,12 +329,11 @@ const PerfilScreen = () => {
           )}
         </View>
       </View>
-      <DownBar /> {/* Barra inferior */}
+      <DownBar />
     </View>
   );
 };
 
-// Estilos da tela
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -504,7 +479,6 @@ const styles = StyleSheet.create({
     color: '#ccc',
     marginTop: 2,
   },
-
 });
 
-export default PerfilScreen; // Exporta o componente principal
+export default PerfilScreen;

@@ -254,9 +254,9 @@ export interface User {
   _id: string;
   id?: string;
   name: string;
-  email: string;
+  email?: string;
   isVerified?: boolean;
-  profileImage?: string; // Adicionado para suportar imagem de perfil
+  profileImage?: string;
   stats?: {
     totalGames: number;
     totalWins: number;

@@ -100,6 +100,8 @@ router.get('/search', async (req, res) => {
 
 // Rota para aceitar solicitação de amizade
 router.post('/accept-request', async (req, res) => {
+  console.log('Rota /accept-request chamada', req.body);
+  // requestId aqui é o _id do usuário que enviou a solicitação (não o id do objeto friendRequest)
   const { userId, requestId } = req.body;
 
   try {
@@ -111,9 +113,15 @@ router.post('/accept-request', async (req, res) => {
     }
 
     // Remover da lista de solicitações
-    const requestIndex = user.friendRequests.findIndex(request =>
-      request.userId.equals(requester._id)
-    );
+    // Corrige para comparar tanto string quanto objeto populado
+    const requestIndex = user.friendRequests.findIndex(request => {
+      // request.userId pode ser ObjectId, string ou objeto populado
+      let reqId = request.userId;
+      if (typeof reqId === 'object' && reqId !== null && reqId._id) {
+        reqId = reqId._id;
+      }
+      return reqId.toString() === requestId.toString();
+    });
 
     if (requestIndex === -1) {
       return res.status(400).json({ error: 'Solicitação não encontrada' });
@@ -122,10 +130,22 @@ router.post('/accept-request', async (req, res) => {
     user.friendRequests.splice(requestIndex, 1);
 
     // Adicionar como amigo em ambos os usuários, se ainda não estiverem
-    if (!user.friends.some(f => f.userId.equals(requester._id))) {
+    if (!user.friends.some(f => {
+      let fId = f.userId;
+      if (typeof fId === 'object' && fId !== null && fId._id) {
+        fId = fId._id;
+      }
+      return fId.toString() === requestId.toString();
+    })) {
       user.friends.push({ userId: requester._id, status: 'accepted' });
     }
-    if (!requester.friends.some(f => f.userId.equals(user._id))) {
+    if (!requester.friends.some(f => {
+      let fId = f.userId;
+      if (typeof fId === 'object' && fId !== null && fId._id) {
+        fId = fId._id;
+      }
+      return fId.toString() === user._id.toString();
+    })) {
       requester.friends.push({ userId: user._id, status: 'accepted' });
     }
 

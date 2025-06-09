@@ -106,11 +106,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.select({ ios: 0, android: 8 }), // Ajuste para status bar no Android
-    shadowColor: "rgba(0, 0, 0, 0.25)",
-    shadowOffset: { width: 0, height: 2 }, // Sombra mais sutil
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
-    elevation: 3,
+    boxShadow: Platform.OS === 'web' ? '0px 2px 4px rgba(0,0,0,0.25)' : undefined,
   },
   sideElement: {
     width: 32, // Reduzido
