@@ -6,12 +6,19 @@ const User = require('../models/User');
 // Rota para enviar solicitação de amizade
 router.post('/send-request', async (req, res) => {
   console.log('Corpo da requisição:', req.body);
-  
+
   const { senderId, recipientId } = req.body;
 
+  // Adiciona validação de ObjectId
   if (!senderId || !recipientId) {
     return res.status(400).json({ 
       error: 'Dados incompletos',
+      details: { senderId, recipientId }
+    });
+  }
+  if (!mongoose.Types.ObjectId.isValid(senderId) || !mongoose.Types.ObjectId.isValid(recipientId)) {
+    return res.status(400).json({ 
+      error: 'IDs inválidos',
       details: { senderId, recipientId }
     });
   }
@@ -99,53 +106,62 @@ router.get('/search', async (req, res) => {
 });
 
 // Rota para aceitar solicitação de amizade
+// ATENÇÃO: O corpo do POST deve ser:
+// {
+//   "userId": "<ID do usuário que está aceitando>",
+//   "requestId": "<_id do objeto FriendRequest>"
+// }
+// O requestId NÃO é o userId do solicitante, é o _id da solicitação (FriendRequest._id)
 router.post('/accept-request', async (req, res) => {
   console.log('Rota /accept-request chamada', req.body);
-  // requestId aqui é o _id do usuário que enviou a solicitação (não o id do objeto friendRequest)
+
   const { userId, requestId } = req.body;
 
-  try {
-    const user = await User.findById(userId);
-    const requester = await User.findById(requestId);
+  if (!userId || !requestId) {
+    return res.status(400).json({ error: 'userId e requestId são obrigatórios', details: { userId, requestId } });
+  }
 
-    if (!user || !requester) {
+  try {
+    const user = await User.findById(userId).populate('friendRequests.userId', 'name _id profileImage');
+    if (!user) {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Remover da lista de solicitações
-    // Corrige para comparar tanto string quanto objeto populado
-    const requestIndex = user.friendRequests.findIndex(request => {
-      // request.userId pode ser ObjectId, string ou objeto populado
-      let reqId = request.userId;
-      if (typeof reqId === 'object' && reqId !== null && reqId._id) {
-        reqId = reqId._id;
-      }
-      return reqId.toString() === requestId.toString();
-    });
-
+    // Encontre o índice da solicitação pelo _id da solicitação
+    const requestIndex = user.friendRequests.findIndex(r => r._id.toString() === requestId);
     if (requestIndex === -1) {
       return res.status(400).json({ error: 'Solicitação não encontrada' });
     }
+    const request = user.friendRequests[requestIndex];
 
+    // O usuário que enviou a solicitação
+    // Corrige para garantir que sempre pegamos o ObjectId
+    let requesterId;
+    if (request.userId && request.userId._id) {
+      requesterId = request.userId._id;
+    } else {
+      requesterId = request.userId;
+    }
+
+    // Verifica se o requesterId é válido
+    if (!requesterId) {
+      return res.status(400).json({ error: 'Solicitante inválido na solicitação de amizade', details: { request } });
+    }
+
+    const requester = await User.findById(requesterId);
+
+    if (!requester) {
+      return res.status(404).json({ error: 'Solicitante não encontrado' });
+    }
+
+    // Remover a solicitação manualmente
     user.friendRequests.splice(requestIndex, 1);
 
     // Adicionar como amigo em ambos os usuários, se ainda não estiverem
-    if (!user.friends.some(f => {
-      let fId = f.userId;
-      if (typeof fId === 'object' && fId !== null && fId._id) {
-        fId = fId._id;
-      }
-      return fId.toString() === requestId.toString();
-    })) {
+    if (!user.friends.some(f => f.userId.equals(requester._id))) {
       user.friends.push({ userId: requester._id, status: 'accepted' });
     }
-    if (!requester.friends.some(f => {
-      let fId = f.userId;
-      if (typeof fId === 'object' && fId !== null && fId._id) {
-        fId = fId._id;
-      }
-      return fId.toString() === user._id.toString();
-    })) {
+    if (!requester.friends.some(f => f.userId.equals(user._id))) {
       requester.friends.push({ userId: user._id, status: 'accepted' });
     }
 
@@ -160,8 +176,8 @@ router.post('/accept-request', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro ao aceitar solicitação:', error);
-    res.status(500).json({ error: 'Erro ao aceitar solicitação de amizade' });
+    console.error('Erro ao aceitar solicitação:', error, error?.message, error?.stack);
+    res.status(500).json({ error: 'Erro ao aceitar solicitação de amizade', details: error?.message });
   }
 });
 
@@ -176,14 +192,11 @@ router.post('/reject-request', async (req, res) => {
       return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    const requestIndex = user.friendRequests.findIndex(request => 
-      request.userId.equals(requestId)
-    );
-
+    // Remover a solicitação pelo _id da solicitação manualmente
+    const requestIndex = user.friendRequests.findIndex(r => r._id.toString() === requestId);
     if (requestIndex === -1) {
       return res.status(400).json({ error: 'Solicitação não encontrada' });
     }
-
     user.friendRequests.splice(requestIndex, 1);
     await user.save();
 
