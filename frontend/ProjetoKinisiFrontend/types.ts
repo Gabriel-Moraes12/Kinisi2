@@ -289,9 +289,23 @@ export interface Friend {
 }
 
 /**
+ * Representa um convite de jogo entre amigos.
+ */
+export interface GameInvite {
+  _id: string;
+  from: string | User;
+  to: string | User;
+  topics: string[];
+  timePerQuestion: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  date: Date;
+}
+
+/**
  * Representa uma solicitação de amizade.
  */
 export interface FriendRequest {
+  _id: string;
   userId: string | User;
   date: Date;
 }

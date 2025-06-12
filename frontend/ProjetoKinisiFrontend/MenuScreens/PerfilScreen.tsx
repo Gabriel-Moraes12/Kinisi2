@@ -101,7 +101,9 @@ const PerfilScreen = () => {
         senderId: user._id,
         recipientId: userId
       };
-      
+      // Adiciona log para depuração
+      console.log('Enviando solicitação de amizade:', requestData);
+
       const response = await api.post('/friends/send-request', requestData);
       
       Alert.alert('Sucesso', response.data.message || 'Solicitação enviada com sucesso!');
@@ -121,36 +123,28 @@ const PerfilScreen = () => {
     }
   };
 
-  const acceptFriendRequest = async (requesterUserId: string) => {
-  if (!isAuthenticated || !user?._id) return;
-  
-  try {
-    setLoading(true);
-    console.log('Enviando para:', `/friends/accept-request`, { // Adicione este log
-      userId: user._id,
-      requestId: requesterUserId
-    });
-    
-    const response = await api.post('/friends/accept-request', {
-      userId: user._id,
-      requestId: requesterUserId
-    });
-    
-    console.log('Resposta:', response.data); // Adicione este log
-    await loadFriendData();
-    Alert.alert('Sucesso', response.data.message || 'Agora vocês são amigos!');
-  } catch (error: any) {
-    console.error('Erro completo:', error); // Adicione este log
-    Alert.alert(
-      'Erro', 
-      error.response?.data?.error || 
-      error.message || 
-      'Falha ao aceitar solicitação'
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+  const acceptFriendRequest = async (requestId: string) => {
+    if (!isAuthenticated || !user?._id) return;
+    try {
+      setLoading(true);
+      // O requestId aqui deve ser o FriendRequest._id
+      const response = await api.post('/friends/accept-request', {
+        userId: user._id,
+        requestId: requestId
+      });
+      await loadFriendData();
+      Alert.alert('Sucesso', response.data.message || 'Agora vocês são amigos!');
+    } catch (error: any) {
+      Alert.alert(
+        'Erro', 
+        error.response?.data?.error || 
+        error.message || 
+        'Falha ao aceitar solicitação'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const rejectFriendRequest = async (requesterUserId: string) => {
     if (!isAuthenticated || !user?._id) return;
@@ -198,9 +192,14 @@ const PerfilScreen = () => {
   );
 
   const renderFriendRequest: ListRenderItem<FriendRequest> = ({ item }) => {
-    const requestUser = typeof item.userId === 'string' ? 
-      { _id: item.userId, name: 'Usuário' } : item.userId;
-    
+    // Garante que requestUser é sempre um objeto com _id e name
+    const requestUser = typeof item.userId === 'string'
+      ? { _id: item.userId, name: 'Usuário' }
+      : item.userId;
+
+    // O ID da solicitação é o _id do objeto FriendRequest
+    const requestId = item._id;
+
     return (
       <View style={styles.requestItem}>
         <View style={styles.userInfoContainer}>
@@ -216,16 +215,28 @@ const PerfilScreen = () => {
           <Text style={styles.whiteText}>{requestUser.name} quer ser seu amigo</Text>
         </View>
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.acceptButton}
-            onPress={() => acceptFriendRequest(requestUser._id)}
+            onPress={() => {
+              if (!requestId) {
+                Alert.alert('Erro', 'ID da solicitação não encontrado');
+                return;
+              }
+              acceptFriendRequest(requestId);
+            }}
             disabled={loading}
           >
             <Text style={styles.buttonText}>Aceitar</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.rejectButton}
-            onPress={() => rejectFriendRequest(requestUser._id)}
+            onPress={() => {
+              if (!requestId) {
+                Alert.alert('Erro', 'ID da solicitação não encontrado');
+                return;
+              }
+              rejectFriendRequest(requestId);
+            }}
             disabled={loading}
           >
             <Text style={styles.buttonText}>Recusar</Text>
